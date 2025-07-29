@@ -1,33 +1,46 @@
-import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { User } from "../user/user.model";
-import { Wallet } from "../wallet/wallet.model";
-
+import { Request, Response } from 'express';
+import * as authService from './auth.service';
+import { registerSchema, loginSchema } from './auth.validation';
+import { ZodError } from 'zod';
 
 export const register = async (req: Request, res: Response) => {
-  const { name, email, password, role } = req.body;
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, password: hashedPassword, role });
-
-  // Create wallet with ৳50 initial balance
-  await Wallet.create({ user: user._id, balance: 50 });
-
-  res.status(201).json({ message: "User registered", user });
+  try {
+    registerSchema.parse(req.body);
+    const user = await authService.registerUser(req.body);
+    res.status(201).json({ message: 'User registered', user });
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: err.issues.map(e => ({ field: e.path[0], message: e.message })),
+      });
+    }
+    res.status(400).json({ message: 'Registration failed', error: (err as Error).message });
+  }
 };
 
 export const login = async (req: Request, res: Response) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+  try {
+    loginSchema.parse(req.body);
+    const data = await authService.loginUser(req.body);
+    res.status(200).json(data);
+  } catch (err) {
+    if (err instanceof ZodError) {
+      return res.status(400).json({
+        message: 'Validation failed',
+        errors: err.issues.map(e => ({ field: e.path[0], message: e.message })),
+      });
+    }
+    res.status(401).json({ message: 'Login failed', error: (err as Error).message });
+  }
+};
 
-  const match = await bcrypt.compare(password, user.password as string);
-  if (!match) return res.status(401).json({ message: "Invalid credentials" });
-
-  const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET!, {
-    expiresIn: "1d",
-  });
-
-  res.status(200).json({ token, user });
+export const logout = async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body;
+    await authService.logoutUser(refreshToken);
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Logout failed', error: (err as Error).message });
+  }
 };
