@@ -3,7 +3,7 @@ import { connectDB } from "./config/db";
 import { app } from "./app";
 
 dotenv.config();
-
+console.log('Access Token Secret:', process.env.ACCESS_TOKEN_SECRET);
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {

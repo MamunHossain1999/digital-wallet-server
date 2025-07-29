@@ -1,41 +1,16 @@
-import { model, Schema } from "mongoose";
-import { IAuthProvider, isActive, IUser, Role } from "./user.interface";
+import { Schema, model, Document } from 'mongoose';
+import { IUser } from '../../interfaces/IUser';
 
-const authProviderSchema = new Schema<IAuthProvider>({
-    provider: {type: String, required:true},
-    providerId: {type: String, required:true},
-},{
-    versionKey: false,
-    _id: false
-})
+export type UserDocument = IUser & Document;
 
-const userSchema = new Schema<IUser>({
-    name: {type: String, required: true},
-    email: {type: String, required: true, unique:true},
-    password: {type:String},
-    role: {
-        type: String,
-        enum: Object.values(Role),
-        default: Role.USER
-    },
-    phone: {type:String},
-    picture:{type:String},
-    address: {type:String},
-    isDeleted: {type:String},
-    isActive: {
-        type:String,
-        enum:Object.values(isActive),
-        default:isActive.ACTIVE,
-    },
-    isVerified: {type:Boolean, default: false},
-    auths:[authProviderSchema],
-    bookings:{
+const userSchema = new Schema<UserDocument>({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ['admin', 'user', 'agent'], required: true },
+  status: { type: String, enum: ['active', 'blocked'], default: 'active' },
+  commissionRate: { type: Number, default: 0 },
+  isApproved: { type: Boolean, default: false }
+}, { timestamps: true });
 
-    }
-
-},{
-    timestamps: true,
-    versionKey: false
-})
-
-export const User = model<IUser>("User", userSchema)
+export const User = model<UserDocument>('User', userSchema);

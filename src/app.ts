@@ -2,6 +2,11 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";    
+import { AuthRoutes } from "./modules/auth/auth.route";
+import { globalErrorHandler } from "./middlewares/globalErrorHandler";
+import { walletRoutes } from "./modules/wallet/wallet.routes";
+import { AuthTransation } from "./modules/transaction/transaction.routes";
+
 
 
 
@@ -17,7 +22,8 @@ app.use(
   })
 );
 app.use(express.json());
-
-// app.use("/api/books", BookRoutes);
-// app.use(globalErrorHandler);
+app.use("/api/auth", AuthRoutes);
+app.use('/api/transation', AuthTransation);
+app.use('/api/wallet', walletRoutes);
+app.use(globalErrorHandler);
 export { app };
