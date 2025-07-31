@@ -1,31 +1,51 @@
 
+interface RequestWithUser extends Request {
+  user?: {
+    userId: string;
+    role: string;
+  };
+}
 import { Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Wallet from '../wallet/wallet.model';
 import { Transaction } from './transaction.model';
 
+
+// wallet a money add kora 
 export const topUp = asyncHandler(async (req: Request, res: Response) => {
   const userId = (req as any).user?._id;
   const { amount } = req.body;
+
+//   console.log('Top-up request by user:', userId);
+//   console.log('Requested amount:', amount);
 
   if (amount <= 0) throw new Error('Amount must be positive.');
 
   const wallet = await Wallet.findOne({ owner: userId });
   if (!wallet || wallet.isBlocked) throw new Error('Wallet not found or blocked.');
 
-  wallet.balance += amount;
+  const fee = 0;
+  const netAmount = amount - fee;
+  if(netAmount <= 0) throw new Error('Amount after fee must be positive.');
+
+  wallet.balance += netAmount;
   await wallet.save();
 
   const trx = await Transaction.create({
     from: userId,
-    amount,
+    amount: netAmount,
+    fee: fee,
     type: 'add',
     status: 'completed',
   });
 
+  console.log('Transaction saved:', trx);
+
   res.status(201).json({ message: 'Top-up successful', trx });
 });
 
+
+// wallet theke money withdraw kora 
 export const withdraw = asyncHandler(async (req: Request, res: Response) => {
   const userId = (req as any).user?._id;
   const { amount } = req.body;
@@ -49,6 +69,8 @@ export const withdraw = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json({ message: 'Withdraw successful', trx });
 });
 
+
+// wallet theke money send kora
 export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
   const senderId = (req as any).user?._id;
   const { receiverId, amount } = req.body;
@@ -80,6 +102,8 @@ export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json({ message: 'Money sent successfully', trx });
 });
 
+
+// transation history dekha
 export const getMyTransactions = asyncHandler(async (req: Request, res: Response) => {
   const userId = (req as any).user?._id;
 
@@ -90,9 +114,12 @@ export const getMyTransactions = asyncHandler(async (req: Request, res: Response
   res.status(200).json({ transactions });
 });
 
-export const getAllTransactions = asyncHandler(async (req: Request, res: Response) => {
-  if ((req as any).user?.role !== 'admin') {
-    return res.status(403).json({ message: 'Access denied: Admins only' });
+
+// admin er jnno show show kora
+export const getAllTransactions = asyncHandler(async (req: RequestWithUser, res: Response) => {
+  if (req.user?.role !== 'admin') {
+    res.status(403).json({ message: 'Access denied: Admins only' });
+    return;  
   }
 
   const transactions = await Transaction.find()
@@ -100,4 +127,6 @@ export const getAllTransactions = asyncHandler(async (req: Request, res: Respons
     .populate('to', 'email role');
 
   res.status(200).json(transactions);
+ 
 });
+
