@@ -1,8 +1,7 @@
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import Wallet from "../wallet/wallet.model";
 import { User } from "../user/user.model";
-
+import { generateAccessToken, generateRefreshToken } from "../../utils/token";
 
 const refreshTokens: string[] = [];
 
@@ -13,12 +12,20 @@ interface RegisterInput {
   role?: "user" | "agent" | "admin";
 }
 
+
+// register user
 export const registerUser = async ({
   name,
   email,
   password,
   role = "user",
 }: RegisterInput) => {
+// akjoner besi admin hote parbe na
+  if (role === "admin") {
+    const existingAdmin = await User.findOne({ role: "admin" });
+    if (existingAdmin) throw new Error("Only one admin allowed.");
+  }
+
   const existingUser = await User.findOne({ email });
   if (existingUser) throw new Error("Email already registered");
 
@@ -34,34 +41,18 @@ export const registerUser = async ({
 
   const payload = { userId: user._id.toString(), role: user.role };
 
-  const accessToken = jwt.sign(
-    payload,
-    process.env.ACCESS_TOKEN_SECRET as string,
-    { expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "1d" }
-  );
+  const accessToken = generateAccessToken(payload);
 
-  const refreshToken = jwt.sign(
-    payload,
-    process.env.REFRESH_TOKEN_SECRET as string,
-    { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d" }
-  );
+  const refreshToken = generateRefreshToken(payload);
 
-  // Optional: add the refresh token to the list (like in loginUser)
   refreshTokens.push(refreshToken);
 
-  return {
-    user: {
-      _id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    },
-    accessToken,
-    refreshToken,
-  };
+  return { user, accessToken, refreshToken };
 };
 
 
+
+// login user
 export const loginUser = async ({
   email,
   password,
@@ -77,17 +68,9 @@ export const loginUser = async ({
 
   const payload = { userId: user._id.toString(), role: user.role };
 
-  const accessToken = jwt.sign(
-    payload,
-    process.env.ACCESS_TOKEN_SECRET as string,
-    { expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN || "1d" }
-  );
+  const accessToken = generateAccessToken(payload);
 
-  const refreshToken = jwt.sign(
-    payload,
-    process.env.REFRESH_TOKEN_SECRET as string,
-    { expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || "7d" }
-  );
+  const refreshToken = generateRefreshToken(payload);
 
   refreshTokens.push(refreshToken);
 
@@ -103,6 +86,7 @@ export const loginUser = async ({
   };
 };
 
+// logout 
 export const logoutUser = async (refreshToken: string) => {
   const index = refreshTokens.indexOf(refreshToken);
   if (index > -1) {
