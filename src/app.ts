@@ -6,6 +6,7 @@ import { AuthRoutes } from "./modules/auth/auth.route";
 import { globalErrorHandler } from "./middlewares/globalErrorHandler";
 import { walletRoutes } from "./modules/wallet/wallet.routes";
 import { AuthTransation } from "./modules/transaction/transaction.routes";
+import { adminRouter } from "./modules/auth/admin.route";
 
 
 
@@ -23,7 +24,8 @@ app.use(
 );
 app.use(express.json());
 app.use("/api/auth", AuthRoutes);
-app.use('/api/transation', AuthTransation);
+app.use('/api/admin', adminRouter);
+app.use('/api/transaction', AuthTransation);
 app.use('/api/wallet', walletRoutes);
 app.use(globalErrorHandler);
 export { app };
