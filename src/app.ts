@@ -8,16 +8,12 @@ import { walletRoutes } from "./modules/wallet/wallet.routes";
 import { AuthTransation } from "./modules/transaction/transaction.routes";
 import { adminRouter } from "./modules/auth/admin.route";
 
-
-
-
-
 const app = express();
 app.use(morgan("dev"));             
 app.use(cookieParser());
 app.use(
   cors({
-    origin: ["https://libray-management-system-frontend-1q59o1xn2.vercel.app", "http://localhost:5173"],
+    origin: ["http://localhost:5173"],
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
