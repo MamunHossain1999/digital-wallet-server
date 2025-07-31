@@ -25,6 +25,7 @@ export const addMoney = async (req: RequestWithUser, res: Response) => {
   res.json({ message: 'Money added successfully', balance: wallet.balance });
 };
 
+// money withdraw korar jnno
 export const withdrawMoney = async (req: RequestWithUser, res: Response) => {
   const userId = req.user?.userId;
   const { amount } = req.body;
@@ -45,6 +46,7 @@ export const withdrawMoney = async (req: RequestWithUser, res: Response) => {
   res.json({ message: 'Money withdrawn successfully', balance: wallet.balance });
 };
 
+// onnno user er kase money send korar jnno
 export const sendMoney = async (req: RequestWithUser, res: Response) => {
   const senderId = req.user?.userId;
   const { receiverId, amount } = req.body;
@@ -73,6 +75,7 @@ export const sendMoney = async (req: RequestWithUser, res: Response) => {
   res.json({ message: 'Money sent successfully', senderBalance: senderWallet.balance });
 };
 
+// nijer waller sk sathe dekhar jnno
 export const getWalletBalance = async (req: RequestWithUser, res: Response) => {
   try {
     const userId = req.user?.userId;
@@ -87,6 +90,8 @@ export const getWalletBalance = async (req: RequestWithUser, res: Response) => {
   }
 };
 
+
+// sob waller sk sathe dekhar jnno
 export const getAllWallets = async (req: RequestWithUser, res: Response) => {
   try {
     if (req.user?.role !== 'admin') {
@@ -101,6 +106,7 @@ export const getAllWallets = async (req: RequestWithUser, res: Response) => {
 };
 
 
+// admin block unblock korar jnno
 export const blockWallet = async (
   req: Request<{ id: string }, any, BlockWalletRequestBody>,
   res: Response
