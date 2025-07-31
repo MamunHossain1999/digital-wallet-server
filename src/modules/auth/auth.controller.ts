@@ -3,6 +3,8 @@ import * as authService from './auth.service';
 import { registerSchema, loginSchema } from './auth.validation';
 import { ZodError } from 'zod';
 
+
+// register
 export const register = async (req: Request, res: Response) => {
   try {
     registerSchema.parse(req.body);
@@ -19,6 +21,8 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
+
+// login
 export const login = async (req: Request, res: Response) => {
   try {
     loginSchema.parse(req.body);
@@ -35,6 +39,8 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+
+// logout
 export const logout = async (req: Request, res: Response) => {
   try {
     const { refreshToken } = req.body;
