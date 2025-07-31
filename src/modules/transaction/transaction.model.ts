@@ -1,29 +1,45 @@
-import mongoose, { Document, Schema, Model } from 'mongoose';
-import { ITransaction, TransactionType, TransactionStatus } from '../../interfaces/ITransaction';
+// src/models/transaction.model.ts
 
-interface ITransactionModel extends ITransaction, Document {}
+import { Schema, model } from 'mongoose';
+import { ITransaction } from '../../interfaces/ITransaction';
 
-const transactionSchema: Schema<ITransactionModel> = new Schema(
+
+const transactionSchema = new Schema<ITransaction>(
   {
     type: {
       type: String,
-      enum: ['add', 'withdraw', 'transfer', 'cash-in', 'cash-out'] as TransactionType[],
+      enum: ['add', 'withdraw', 'transfer', 'cash-in', 'cash-out'],
       required: true,
     },
-    from: { type: Schema.Types.ObjectId, ref: 'User' }, // যিনি পাঠাচ্ছেন
-    to: { type: Schema.Types.ObjectId, ref: 'User' },   // যিনি পাচ্ছেন
-    amount: { type: Number, required: true },
-    fee: { type: Number, default: 0 },
-    commission: { type: Number, default: 0 },
+    from: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    to: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    amount: {
+      type: Number,
+      required: true,
+    },
+    fee: {
+      type: Number,
+      default: 0,
+    },
+    commission: {
+      type: Number,
+      default: 0,
+    },
     status: {
       type: String,
-      enum: ['pending', 'completed', 'reversed'] as TransactionStatus[],
+      enum: ['pending', 'completed', 'reversed'],
       default: 'completed',
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-const Transaction: Model<ITransactionModel> = mongoose.model<ITransactionModel>('Transaction', transactionSchema);
-
-export default Transaction;
+export const Transaction = model<ITransaction>('Transaction', transactionSchema);
