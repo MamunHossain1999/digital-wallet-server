@@ -76,3 +76,6 @@ Postman for API testing
 
 
 Live link: https://digital-wallet-system-rose.vercel.app/
+
+npm install google-auth-library
+npm install passport passport-google-oauth20

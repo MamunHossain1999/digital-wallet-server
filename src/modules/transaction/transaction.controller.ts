@@ -9,19 +9,20 @@ import { Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Wallet from '../wallet/wallet.model';
 import { Transaction } from './transaction.model';
+import { User } from '../user/user.model';
 
 
 // wallet a money add kora 
 export const topUp = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req as any).user?._id;
+  const userId = (req as any).user?.userId;
   const { amount } = req.body;
 
-//   console.log('Top-up request by user:', userId);
-//   console.log('Requested amount:', amount);
+  console.log('Top-up request by user:', userId);
+  console.log('Requested amount:', amount);
 
   if (amount <= 0) throw new Error('Amount must be positive.');
 
-  const wallet = await Wallet.findOne({ owner: userId });
+  const wallet = await Wallet.findOne({ user: userId });
   if (!wallet || wallet.isBlocked) throw new Error('Wallet not found or blocked.');
 
   const fee = 0;
@@ -47,12 +48,12 @@ export const topUp = asyncHandler(async (req: Request, res: Response) => {
 
 // wallet theke money withdraw kora 
 export const withdraw = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req as any).user?._id;
+  const userId = (req as any).user?.userId;
   const { amount } = req.body;
 
   if (amount <= 0) throw new Error('Amount must be positive.');
 
-  const wallet = await Wallet.findOne({ owner: userId });
+  const wallet = await Wallet.findOne({ user: userId });
   if (!wallet || wallet.isBlocked) throw new Error('Wallet not found or blocked.');
   if (wallet.balance < amount) throw new Error('Insufficient balance.');
 
@@ -72,14 +73,17 @@ export const withdraw = asyncHandler(async (req: Request, res: Response) => {
 
 // wallet theke money send kora
 export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
-  const senderId = (req as any).user?._id;
-  const { receiverId, amount } = req.body;
+  const senderId = (req as any).user?.userId;
+  const { email, amount } = req.body;
 
-  if (senderId === receiverId) throw new Error('Cannot send money to yourself.');
+  if (!email) throw new Error("Receiver email required");
   if (amount <= 0) throw new Error('Amount must be positive.');
 
-  const senderWallet = await Wallet.findOne({ owner: senderId });
-  const receiverWallet = await Wallet.findOne({ owner: receiverId });
+  const senderWallet = await Wallet.findOne({ user: senderId });
+  const receiverUser = await User.findOne({ email: email });
+  if (!receiverUser) throw new Error("Receiver not found");
+
+  const receiverWallet = await Wallet.findOne({ user: receiverUser._id });
 
   if (!senderWallet || senderWallet.isBlocked) throw new Error('Sender wallet not found or blocked.');
   if (!receiverWallet || receiverWallet.isBlocked) throw new Error('Receiver wallet not found or blocked.');
@@ -93,7 +97,7 @@ export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
 
   const trx = await Transaction.create({
     from: senderId,
-    to: receiverId,
+    to: receiverUser._id,
     amount,
     type: 'transfer',
     status: 'completed',
@@ -103,9 +107,10 @@ export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
 });
 
 
+
 // transation history dekha
 export const getMyTransactions = asyncHandler(async (req: Request, res: Response) => {
-  const userId = (req as any).user?._id;
+  const userId = (req as any).user?.userId;
 
   const transactions = await Transaction.find({
     $or: [{ from: userId }, { to: userId }],

@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import Wallet from './wallet.model';
 import { RequestWithUser } from '../../middlewares/verifyToken';
 import { Transaction } from '../transaction/transaction.model';
+import mongoose from 'mongoose';
+import { User } from '../user/user.model';
 interface BlockWalletRequestBody {
   block: boolean;
 }
@@ -48,15 +50,21 @@ export const withdrawMoney = async (req: RequestWithUser, res: Response) => {
 
 // onnno user er kase money send korar jnno
 export const sendMoney = async (req: RequestWithUser, res: Response) => {
-  const senderId = req.user?.userId;
-  const { receiverId, amount } = req.body;
+  const { receiverEmail, amount } = req.body;
+const senderId = req.user?.userId;
 
-  if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
-  if (!receiverId) return res.status(400).json({ message: 'Receiver ID is required' });
-  if (receiverId === senderId) return res.status(400).json({ message: 'Cannot send money to self' });
+if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
+if (!receiverEmail) return res.status(400).json({ message: 'Receiver Email is required' });
 
-  const senderWallet = await Wallet.findOne({ user: senderId });
-  const receiverWallet = await Wallet.findOne({ user: receiverId });
+const receiverUser = await User.findOne({ email: receiverEmail });
+if (!receiverUser) return res.status(404).json({ message: 'Receiver not found' });
+
+const receiverId = receiverUser._id.toString();
+
+if (receiverId === senderId) return res.status(400).json({ message: 'Cannot send money to self' });
+
+const senderWallet = await Wallet.findOne({ user: senderId });
+const receiverWallet = await Wallet.findOne({ user: receiverId });
 
   if (!senderWallet || !receiverWallet) return res.status(404).json({ message: 'Wallet not found' });
   if (senderWallet.status === 'blocked' || receiverWallet.status === 'blocked')
@@ -115,6 +123,10 @@ export const blockWallet = async (
     const walletId = req.params.id;
     const { block } = req.body;
 
+    if (!mongoose.Types.ObjectId.isValid(walletId)) {
+  return res.status(400).json({ message: "Invalid wallet ID" });
+}
+
     if (typeof block !== "boolean") {
       return res
         .status(400)
@@ -134,6 +146,7 @@ export const blockWallet = async (
       wallet,
     });
   } catch (error) {
-    res.status(500).json({ message: "Internal server error", error });
+    console.error("Block wallet error:", error);
+    res.status(500).json({ message: "Internal server error", error: (error as Error).message });
   }
 };

@@ -12,4 +12,13 @@ export interface IUser {
   updatedAt?: Date;
   commissionRate?: number;
   isApproved?: boolean;
+  image?: string;
+  refreshTokens: string[]; // DB তে store হয়
+}
+
+// Login বা register response type
+export interface AuthResponse {
+  user: IUser;          // user info
+  accessToken: string;  // login-এ client-এ পাঠানো
+  refreshToken: string; // cookie বা response-এ
 }

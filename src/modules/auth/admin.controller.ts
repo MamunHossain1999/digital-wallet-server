@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import Wallet from '../wallet/wallet.model';
 import { User } from '../user/user.model';
 import { Transaction } from '../transaction/transaction.model';
+import { RequestWithUser } from '../../middlewares/verifyToken';
 
 
 export const getAdminDashboard = async (req: Request, res: Response) => {
@@ -27,5 +28,20 @@ export const getAdminDashboard = async (req: Request, res: Response) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to load dashboard', error });
+  }
+};
+
+
+export const getAdminProfile = async (req: RequestWithUser, res: Response) => {
+  try {
+    const adminId = req.user?.userId;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
+
+    const admin = await User.findById(adminId).select("name email role status");
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+
+    res.json(admin);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
   }
 };

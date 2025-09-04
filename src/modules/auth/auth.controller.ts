@@ -1,10 +1,13 @@
-import { Request, Response } from 'express';
-import * as authService from './auth.service';
-import { registerSchema, loginSchema } from './auth.validation';
-import { ZodError } from 'zod';
+// auth.controller.ts
+import { Request, Response, RequestHandler } from "express";
+import * as authService from "./auth.service";
+import { ZodError } from "zod";
+import { loginSchema, registerSchema } from "./auth.validation";
+import { User } from "../user/user.model";
+import Wallet from "../wallet/wallet.model";
+import { Transaction } from "../transaction/transaction.model";
 
-
-// register
+// -------- Register --------
 export const register = async (req: Request, res: Response) => {
   try {
     registerSchema.parse(req.body);
@@ -21,32 +24,112 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-
-// login
+// -------- Login --------
 export const login = async (req: Request, res: Response) => {
   try {
     loginSchema.parse(req.body);
-    const data = await authService.loginUser(req.body);
-    res.status(200).json(data);
+
+    const data = await authService.loginUser(req.body, res);
+
+    res.status(200).json({
+      message: "Login successful",
+      user: data.user,
+    });
   } catch (err) {
-    if (err instanceof ZodError) {
-      return res.status(400).json({
-        message: 'Validation failed',
-        errors: err.issues.map(e => ({ field: e.path[0], message: e.message })),
-      });
-    }
-    res.status(401).json({ message: 'Login failed', error: (err as Error).message });
+    if (err instanceof ZodError)
+      return res
+        .status(400)
+        .json({ message: "Validation failed", errors: err.issues });
+
+    res
+      .status(401)
+      .json({ message: "Login failed", error: (err as Error).message });
   }
 };
 
-
-// logout
+// -------- Logout --------
 export const logout = async (req: Request, res: Response) => {
   try {
-    const { refreshToken } = req.body;
-    await authService.logoutUser(refreshToken);
-    res.status(200).json({ message: 'Logged out successfully' });
+    const token = req.cookies.refreshToken;
+    if (!token) return res.status(400).json({ message: "No token found" });
+
+    await authService.logoutUser(token); // শুধু DB কাজ করবে
+
+    // ✅ cookies clear এখানে করবেন (controller এ)
+    res.clearCookie("accessToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+    });
+
+    return res.json({ message: "Logged out successfully" });
   } catch (err) {
-    res.status(500).json({ message: 'Logout failed', error: (err as Error).message });
+    res
+      .status(500)
+      .json({ message: "Logout failed", error: (err as Error).message });
   }
 };
+
+
+// -------- Me --------
+export const getMe: RequestHandler = async (req, res) => {
+  const userId = (req as any).user?.userId;
+
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const user = await User.findById(userId).select("-password");
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  res.json({
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
+};
+
+
+// agnet profile controller
+export const getAgentProfile: RequestHandler = async (req, res) => {
+  const userId = (req as any).user?.userId;
+
+  if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+  const user = await User.findById(userId).select("-password");
+  if (!user || user.role !== "agent") {
+    return res.status(404).json({ message: "Agent not found" });
+  }
+
+  // Wallet balance
+  const wallet = await Wallet.findOne({ user: userId });
+  const walletBalance = wallet?.balance || 0;
+
+  // Total customers (user collection থেকে count)
+  const totalCustomers = await User.countDocuments({ agentId: userId });
+
+  // Transactions count
+  const transactions = await Transaction.countDocuments({ agent: userId });
+
+  res.json({
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status || "active",
+    walletBalance,
+    totalCustomers,
+    transactions,
+  });
+};
+
+
+

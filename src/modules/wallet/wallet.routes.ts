@@ -1,14 +1,16 @@
 import express from 'express';
-import { addMoney, withdrawMoney, sendMoney, getWalletBalance, getAllWallets, blockWallet,  } from './wallet.controller';
+import { addMoney, withdrawMoney, sendMoney, getWalletBalance, getAllWallets, blockWallet } from './wallet.controller';
 import { verifyToken } from '../../middlewares/verifyToken';
+import { authorizeRole } from '../../middlewares/authorizeRole';
 
 const router = express.Router();
 
-// 🔐 Routes with role-based token verification
-router.get('/me', verifyToken(), getWalletBalance); //user nijer information dekhar jnno
-router.get('/all', verifyToken(['admin']), getAllWallets); //all wallet aksathe dekhar jnno
-router.post('/add-money', verifyToken(['user']), addMoney); //money add korar jnno
-router.post('/withdraw', verifyToken(['user']), withdrawMoney); //money othanor jnno
-router.post('/send-money', verifyToken(['user']), sendMoney);  //money pathanor jnno
-router.patch('/block/:id', verifyToken(['admin']), blockWallet); //admin block korar jnno
+// 🔐 Routes
+router.get('/my', verifyToken(), getWalletBalance); // user sees own wallet
+router.get('/all', verifyToken(), authorizeRole(['admin']), getAllWallets); // admin sees all wallets
+router.post('/add-money', verifyToken(), authorizeRole(['user']), addMoney); // user adds money
+router.post('/withdraw', verifyToken(), authorizeRole(['user']), withdrawMoney); // user withdraws money
+router.post('/send-money', verifyToken(), authorizeRole(['user']), sendMoney); // user sends money
+router.patch('/block/:id', verifyToken(), authorizeRole(['admin']), blockWallet); // admin blocks wallet
+
 export const walletRoutes = router;
