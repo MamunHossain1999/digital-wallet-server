@@ -48,39 +48,12 @@ export const withdrawMoney = async (req: RequestWithUser, res: Response) => {
   res.json({ message: 'Money withdrawn successfully', balance: wallet.balance });
 };
 
-// onnno user er kase money send korar jnno
+// onnno user er kase money send korar jnno - DEPRECATED: Use transaction.controller.ts sendMoney instead
 export const sendMoney = async (req: RequestWithUser, res: Response) => {
-  const { receiverEmail, amount } = req.body;
-const senderId = req.user?.userId;
-
-if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
-if (!receiverEmail) return res.status(400).json({ message: 'Receiver Email is required' });
-
-const receiverUser = await User.findOne({ email: receiverEmail });
-if (!receiverUser) return res.status(404).json({ message: 'Receiver not found' });
-
-const receiverId = receiverUser._id.toString();
-
-if (receiverId === senderId) return res.status(400).json({ message: 'Cannot send money to self' });
-
-const senderWallet = await Wallet.findOne({ user: senderId });
-const receiverWallet = await Wallet.findOne({ user: receiverId });
-
-  if (!senderWallet || !receiverWallet) return res.status(404).json({ message: 'Wallet not found' });
-  if (senderWallet.status === 'blocked' || receiverWallet.status === 'blocked')
-    return res.status(403).json({ message: 'Wallet is blocked' });
-
-  if (senderWallet.balance < amount) return res.status(400).json({ message: 'Insufficient balance' });
-
-  senderWallet.balance -= amount;
-  receiverWallet.balance += amount;
-
-  await senderWallet.save();
-  await receiverWallet.save();
-
-  await Transaction.create({ type: 'transfer', from: senderId, to: receiverId, amount, status: 'completed' });
-
-  res.json({ message: 'Money sent successfully', senderBalance: senderWallet.balance });
+  res.status(410).json({ 
+    message: 'This endpoint is deprecated. Use /api/transaction/send-money instead.',
+    redirectTo: '/api/transaction/send-money'
+  });
 };
 
 // nijer waller sk sathe dekhar jnno
@@ -139,6 +112,7 @@ export const blockWallet = async (
     }
 
     wallet.isBlocked = block;
+    wallet.status = block ? 'blocked' : 'active';
     await wallet.save();
 
     res.status(200).json({

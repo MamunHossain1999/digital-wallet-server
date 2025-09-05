@@ -14,6 +14,7 @@ const userSchema = new Schema<UserDocument>(
     isApproved: { type: Boolean, default: false },
     image: { type: String },
     refreshTokens: { type: [String], default: [] },
+    agentId: { type: Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );

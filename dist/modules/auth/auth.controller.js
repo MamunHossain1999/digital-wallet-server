@@ -95,28 +95,42 @@ exports.login = login;
 const logout = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const token = req.cookies.refreshToken;
-        if (!token)
-            return res.status(400).json({ message: "No token found" });
-        yield authService.logoutUser(token); // শুধু DB কাজ করবে
-        // ✅ cookies clear এখানে করবেন (controller এ)
+        // Even if no token found, still clear cookies for complete logout
+        if (token) {
+            yield authService.logoutUser(token); // শুধু DB কাজ করবে
+        }
+        // ✅ cookies clear এখানে করবেন (controller এ) - Always clear cookies
         res.clearCookie("accessToken", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            secure: true,
+            sameSite: "none",
             path: "/",
         });
         res.clearCookie("refreshToken", {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
+            secure: true,
+            sameSite: "none",
             path: "/",
         });
         return res.json({ message: "Logged out successfully" });
     }
     catch (err) {
+        // Even if error occurs, still clear cookies
+        res.clearCookie("accessToken", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            path: "/",
+        });
+        res.clearCookie("refreshToken", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            path: "/",
+        });
         res
-            .status(500)
-            .json({ message: "Logout failed", error: err.message });
+            .status(200) // Changed to 200 since cookies are cleared
+            .json({ message: "Logged out successfully", note: "Cookies cleared despite error" });
     }
 });
 exports.logout = logout;

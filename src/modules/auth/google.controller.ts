@@ -32,20 +32,20 @@ export const googleLogin = async (
     // Google login service
     const result: GoogleLoginResult = await handleGoogleLogin(token);
 
-    // Set refresh token cookie
+    // Set refresh token cookie - matching regular login settings
     res.cookie("refreshToken", result.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    // Optionally, set access token cookie
+    // Set access token cookie - matching regular login settings
     res.cookie("accessToken", result.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000, // 1 day
+      secure: true,
+      sameSite: "none",
+      maxAge: 15 * 60 * 1000, // 15 minutes
     });
 
     // Send response

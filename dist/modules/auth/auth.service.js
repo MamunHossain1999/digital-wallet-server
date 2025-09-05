@@ -76,16 +76,28 @@ const loginUser = (input, res) => __awaiter(void 0, void 0, void 0, function* ()
     user.refreshTokens.push(refreshToken);
     yield user.save();
     // ✅ set cookies
+    // res.cookie("accessToken", accessToken, {
+    //   httpOnly: true,
+    //   sameSite: "lax", // localhost এ কাজ করবে
+    //   secure: false,   // dev এর জন্য
+    //   maxAge: 15 * 60 * 1000,
+    // });
+    // res.cookie("refreshToken", refreshToken, {
+    //   httpOnly: true,
+    //   sameSite: "lax",
+    //   secure: false,
+    //   maxAge: 7 * 24 * 60 * 60 * 1000,
+    // });
     res.cookie("accessToken", accessToken, {
         httpOnly: true,
-        sameSite: "lax", // localhost এ কাজ করবে
-        secure: false, // dev এর জন্য
+        sameSite: "none", // cross-domain support
+        secure: true, // HTTPS only
         maxAge: 15 * 60 * 1000,
     });
     res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
-        sameSite: "lax",
-        secure: false,
+        sameSite: "none",
+        secure: true,
         maxAge: 7 * 24 * 60 * 60 * 1000,
     });
     return {

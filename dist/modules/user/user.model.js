@@ -12,5 +12,6 @@ const userSchema = new mongoose_1.Schema({
     isApproved: { type: Boolean, default: false },
     image: { type: String },
     refreshTokens: { type: [String], default: [] },
+    agentId: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true });
 exports.User = (0, mongoose_1.model)("User", userSchema);

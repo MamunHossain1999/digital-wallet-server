@@ -27,7 +27,7 @@ exports.topUp = (0, express_async_handler_1.default)((req, res) => __awaiter(voi
     if (amount <= 0)
         throw new Error('Amount must be positive.');
     const wallet = yield wallet_model_1.default.findOne({ user: userId });
-    if (!wallet || wallet.isBlocked)
+    if (!wallet || wallet.status === 'blocked')
         throw new Error('Wallet not found or blocked.');
     const fee = 0;
     const netAmount = amount - fee;
@@ -53,7 +53,7 @@ exports.withdraw = (0, express_async_handler_1.default)((req, res) => __awaiter(
     if (amount <= 0)
         throw new Error('Amount must be positive.');
     const wallet = yield wallet_model_1.default.findOne({ user: userId });
-    if (!wallet || wallet.isBlocked)
+    if (!wallet || wallet.status === 'blocked')
         throw new Error('Wallet not found or blocked.');
     if (wallet.balance < amount)
         throw new Error('Insufficient balance.');
@@ -76,29 +76,40 @@ exports.sendMoney = (0, express_async_handler_1.default)((req, res) => __awaiter
         throw new Error("Receiver email required");
     if (amount <= 0)
         throw new Error('Amount must be positive.');
-    const senderWallet = yield wallet_model_1.default.findOne({ user: senderId });
     const receiverUser = yield user_model_1.User.findOne({ email: email });
     if (!receiverUser)
         throw new Error("Receiver not found");
-    const receiverWallet = yield wallet_model_1.default.findOne({ user: receiverUser._id });
-    if (!senderWallet || senderWallet.isBlocked)
-        throw new Error('Sender wallet not found or blocked.');
-    if (!receiverWallet || receiverWallet.isBlocked)
-        throw new Error('Receiver wallet not found or blocked.');
-    if (senderWallet.balance < amount)
-        throw new Error('Insufficient balance.');
-    senderWallet.balance -= amount;
-    receiverWallet.balance += amount;
-    yield senderWallet.save();
-    yield receiverWallet.save();
-    const trx = yield transaction_model_1.Transaction.create({
-        from: senderId,
-        to: receiverUser._id,
-        amount,
-        type: 'transfer',
-        status: 'completed',
-    });
-    res.status(201).json({ message: 'Money sent successfully', trx });
+    if (receiverUser._id.toString() === senderId)
+        throw new Error('Cannot send money to yourself');
+    // Use database transaction for atomic operations
+    const session = yield wallet_model_1.default.startSession();
+    try {
+        yield session.withTransaction(() => __awaiter(void 0, void 0, void 0, function* () {
+            const senderWallet = yield wallet_model_1.default.findOne({ user: senderId }).session(session);
+            const receiverWallet = yield wallet_model_1.default.findOne({ user: receiverUser._id }).session(session);
+            if (!senderWallet || senderWallet.status === 'blocked')
+                throw new Error('Sender wallet not found or blocked.');
+            if (!receiverWallet || receiverWallet.status === 'blocked')
+                throw new Error('Receiver wallet not found or blocked.');
+            if (senderWallet.balance < amount)
+                throw new Error('Insufficient balance.');
+            senderWallet.balance -= amount;
+            receiverWallet.balance += amount;
+            yield senderWallet.save({ session });
+            yield receiverWallet.save({ session });
+            yield transaction_model_1.Transaction.create([{
+                    from: senderId,
+                    to: receiverUser._id,
+                    amount,
+                    type: 'transfer',
+                    status: 'completed',
+                }], { session });
+        }));
+        res.status(201).json({ message: 'Money sent successfully' });
+    }
+    finally {
+        yield session.endSession();
+    }
 }));
 // transation history dekha
 exports.getMyTransactions = (0, express_async_handler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {

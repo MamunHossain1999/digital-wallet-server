@@ -23,7 +23,7 @@ export const topUp = asyncHandler(async (req: Request, res: Response) => {
   if (amount <= 0) throw new Error('Amount must be positive.');
 
   const wallet = await Wallet.findOne({ user: userId });
-  if (!wallet || wallet.isBlocked) throw new Error('Wallet not found or blocked.');
+  if (!wallet || wallet.status === 'blocked') throw new Error('Wallet not found or blocked.');
 
   const fee = 0;
   const netAmount = amount - fee;
@@ -54,7 +54,7 @@ export const withdraw = asyncHandler(async (req: Request, res: Response) => {
   if (amount <= 0) throw new Error('Amount must be positive.');
 
   const wallet = await Wallet.findOne({ user: userId });
-  if (!wallet || wallet.isBlocked) throw new Error('Wallet not found or blocked.');
+  if (!wallet || wallet.status === 'blocked') throw new Error('Wallet not found or blocked.');
   if (wallet.balance < amount) throw new Error('Insufficient balance.');
 
   wallet.balance -= amount;
@@ -79,31 +79,42 @@ export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
   if (!email) throw new Error("Receiver email required");
   if (amount <= 0) throw new Error('Amount must be positive.');
 
-  const senderWallet = await Wallet.findOne({ user: senderId });
   const receiverUser = await User.findOne({ email: email });
   if (!receiverUser) throw new Error("Receiver not found");
 
-  const receiverWallet = await Wallet.findOne({ user: receiverUser._id });
+  if (receiverUser._id.toString() === senderId) throw new Error('Cannot send money to yourself');
 
-  if (!senderWallet || senderWallet.isBlocked) throw new Error('Sender wallet not found or blocked.');
-  if (!receiverWallet || receiverWallet.isBlocked) throw new Error('Receiver wallet not found or blocked.');
-  if (senderWallet.balance < amount) throw new Error('Insufficient balance.');
+  // Use database transaction for atomic operations
+  const session = await Wallet.startSession();
+  
+  try {
+    await session.withTransaction(async () => {
+      const senderWallet = await Wallet.findOne({ user: senderId }).session(session);
+      const receiverWallet = await Wallet.findOne({ user: receiverUser._id }).session(session);
 
-  senderWallet.balance -= amount;
-  receiverWallet.balance += amount;
+      if (!senderWallet || senderWallet.status === 'blocked') throw new Error('Sender wallet not found or blocked.');
+      if (!receiverWallet || receiverWallet.status === 'blocked') throw new Error('Receiver wallet not found or blocked.');
+      if (senderWallet.balance < amount) throw new Error('Insufficient balance.');
 
-  await senderWallet.save();
-  await receiverWallet.save();
+      senderWallet.balance -= amount;
+      receiverWallet.balance += amount;
 
-  const trx = await Transaction.create({
-    from: senderId,
-    to: receiverUser._id,
-    amount,
-    type: 'transfer',
-    status: 'completed',
-  });
+      await senderWallet.save({ session });
+      await receiverWallet.save({ session });
 
-  res.status(201).json({ message: 'Money sent successfully', trx });
+      await Transaction.create([{
+        from: senderId,
+        to: receiverUser._id,
+        amount,
+        type: 'transfer',
+        status: 'completed',
+      }], { session });
+    });
+
+    res.status(201).json({ message: 'Money sent successfully' });
+  } finally {
+    await session.endSession();
+  }
 });
 
 

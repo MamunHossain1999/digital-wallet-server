@@ -23,7 +23,7 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, cookie_parser_1.default)());
 // CORS (allow credentials)
 app.use((0, cors_1.default)({
-    origin: ["https://frabjous-kleicha-4e1eb5.netlify.app", "http://localhost:5173"],
+    origin: ["https://digital-wallet-client-mu.vercel.app", "http://localhost:5173"],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     credentials: true,
 }));

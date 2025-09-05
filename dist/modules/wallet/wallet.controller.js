@@ -16,7 +16,6 @@ exports.blockWallet = exports.getAllWallets = exports.getWalletBalance = exports
 const wallet_model_1 = __importDefault(require("./wallet.model"));
 const transaction_model_1 = require("../transaction/transaction.model");
 const mongoose_1 = __importDefault(require("mongoose"));
-const user_model_1 = require("../user/user.model");
 // money add korar jnno
 const addMoney = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -55,35 +54,12 @@ const withdrawMoney = (req, res) => __awaiter(void 0, void 0, void 0, function* 
     res.json({ message: 'Money withdrawn successfully', balance: wallet.balance });
 });
 exports.withdrawMoney = withdrawMoney;
-// onnno user er kase money send korar jnno
+// onnno user er kase money send korar jnno - DEPRECATED: Use transaction.controller.ts sendMoney instead
 const sendMoney = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { receiverEmail, amount } = req.body;
-    const senderId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
-    if (!amount || amount <= 0)
-        return res.status(400).json({ message: 'Invalid amount' });
-    if (!receiverEmail)
-        return res.status(400).json({ message: 'Receiver Email is required' });
-    const receiverUser = yield user_model_1.User.findOne({ email: receiverEmail });
-    if (!receiverUser)
-        return res.status(404).json({ message: 'Receiver not found' });
-    const receiverId = receiverUser._id.toString();
-    if (receiverId === senderId)
-        return res.status(400).json({ message: 'Cannot send money to self' });
-    const senderWallet = yield wallet_model_1.default.findOne({ user: senderId });
-    const receiverWallet = yield wallet_model_1.default.findOne({ user: receiverId });
-    if (!senderWallet || !receiverWallet)
-        return res.status(404).json({ message: 'Wallet not found' });
-    if (senderWallet.status === 'blocked' || receiverWallet.status === 'blocked')
-        return res.status(403).json({ message: 'Wallet is blocked' });
-    if (senderWallet.balance < amount)
-        return res.status(400).json({ message: 'Insufficient balance' });
-    senderWallet.balance -= amount;
-    receiverWallet.balance += amount;
-    yield senderWallet.save();
-    yield receiverWallet.save();
-    yield transaction_model_1.Transaction.create({ type: 'transfer', from: senderId, to: receiverId, amount, status: 'completed' });
-    res.json({ message: 'Money sent successfully', senderBalance: senderWallet.balance });
+    res.status(410).json({
+        message: 'This endpoint is deprecated. Use /api/transaction/send-money instead.',
+        redirectTo: '/api/transaction/send-money'
+    });
 });
 exports.sendMoney = sendMoney;
 // nijer waller sk sathe dekhar jnno
@@ -135,6 +111,7 @@ const blockWallet = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
             return res.status(404).json({ message: "Wallet not found" });
         }
         wallet.isBlocked = block;
+        wallet.status = block ? 'blocked' : 'active';
         yield wallet.save();
         res.status(200).json({
             message: `Wallet ${block ? "blocked" : "unblocked"} successfully`,

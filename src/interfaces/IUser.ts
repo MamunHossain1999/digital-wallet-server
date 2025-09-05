@@ -14,6 +14,7 @@ export interface IUser {
   isApproved?: boolean;
   image?: string;
   refreshTokens: string[]; // DB তে store হয়
+  agentId?: string;
 }
 
 // Login বা register response type
