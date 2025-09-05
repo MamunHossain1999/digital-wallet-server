@@ -16,16 +16,17 @@ exports.getAllTransactions = exports.getMyTransactions = exports.sendMoney = exp
 const express_async_handler_1 = __importDefault(require("express-async-handler"));
 const wallet_model_1 = __importDefault(require("../wallet/wallet.model"));
 const transaction_model_1 = require("./transaction.model");
+const user_model_1 = require("../user/user.model");
 // wallet a money add kora 
 exports.topUp = (0, express_async_handler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
     const { amount } = req.body;
-    //   console.log('Top-up request by user:', userId);
-    //   console.log('Requested amount:', amount);
+    console.log('Top-up request by user:', userId);
+    console.log('Requested amount:', amount);
     if (amount <= 0)
         throw new Error('Amount must be positive.');
-    const wallet = yield wallet_model_1.default.findOne({ owner: userId });
+    const wallet = yield wallet_model_1.default.findOne({ user: userId });
     if (!wallet || wallet.isBlocked)
         throw new Error('Wallet not found or blocked.');
     const fee = 0;
@@ -47,11 +48,11 @@ exports.topUp = (0, express_async_handler_1.default)((req, res) => __awaiter(voi
 // wallet theke money withdraw kora 
 exports.withdraw = (0, express_async_handler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
     const { amount } = req.body;
     if (amount <= 0)
         throw new Error('Amount must be positive.');
-    const wallet = yield wallet_model_1.default.findOne({ owner: userId });
+    const wallet = yield wallet_model_1.default.findOne({ user: userId });
     if (!wallet || wallet.isBlocked)
         throw new Error('Wallet not found or blocked.');
     if (wallet.balance < amount)
@@ -69,14 +70,17 @@ exports.withdraw = (0, express_async_handler_1.default)((req, res) => __awaiter(
 // wallet theke money send kora
 exports.sendMoney = (0, express_async_handler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const senderId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
-    const { receiverId, amount } = req.body;
-    if (senderId === receiverId)
-        throw new Error('Cannot send money to yourself.');
+    const senderId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+    const { email, amount } = req.body;
+    if (!email)
+        throw new Error("Receiver email required");
     if (amount <= 0)
         throw new Error('Amount must be positive.');
-    const senderWallet = yield wallet_model_1.default.findOne({ owner: senderId });
-    const receiverWallet = yield wallet_model_1.default.findOne({ owner: receiverId });
+    const senderWallet = yield wallet_model_1.default.findOne({ user: senderId });
+    const receiverUser = yield user_model_1.User.findOne({ email: email });
+    if (!receiverUser)
+        throw new Error("Receiver not found");
+    const receiverWallet = yield wallet_model_1.default.findOne({ user: receiverUser._id });
     if (!senderWallet || senderWallet.isBlocked)
         throw new Error('Sender wallet not found or blocked.');
     if (!receiverWallet || receiverWallet.isBlocked)
@@ -89,7 +93,7 @@ exports.sendMoney = (0, express_async_handler_1.default)((req, res) => __awaiter
     yield receiverWallet.save();
     const trx = yield transaction_model_1.Transaction.create({
         from: senderId,
-        to: receiverId,
+        to: receiverUser._id,
         amount,
         type: 'transfer',
         status: 'completed',
@@ -99,7 +103,7 @@ exports.sendMoney = (0, express_async_handler_1.default)((req, res) => __awaiter
 // transation history dekha
 exports.getMyTransactions = (0, express_async_handler_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
+    const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
     const transactions = yield transaction_model_1.Transaction.find({
         $or: [{ from: userId }, { to: userId }],
     }).sort({ createdAt: -1 });

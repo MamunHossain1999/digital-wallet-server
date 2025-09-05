@@ -15,6 +15,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.blockWallet = exports.getAllWallets = exports.getWalletBalance = exports.sendMoney = exports.withdrawMoney = exports.addMoney = void 0;
 const wallet_model_1 = __importDefault(require("./wallet.model"));
 const transaction_model_1 = require("../transaction/transaction.model");
+const mongoose_1 = __importDefault(require("mongoose"));
+const user_model_1 = require("../user/user.model");
 // money add korar jnno
 const addMoney = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -56,12 +58,16 @@ exports.withdrawMoney = withdrawMoney;
 // onnno user er kase money send korar jnno
 const sendMoney = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
+    const { receiverEmail, amount } = req.body;
     const senderId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
-    const { receiverId, amount } = req.body;
     if (!amount || amount <= 0)
         return res.status(400).json({ message: 'Invalid amount' });
-    if (!receiverId)
-        return res.status(400).json({ message: 'Receiver ID is required' });
+    if (!receiverEmail)
+        return res.status(400).json({ message: 'Receiver Email is required' });
+    const receiverUser = yield user_model_1.User.findOne({ email: receiverEmail });
+    if (!receiverUser)
+        return res.status(404).json({ message: 'Receiver not found' });
+    const receiverId = receiverUser._id.toString();
     if (receiverId === senderId)
         return res.status(400).json({ message: 'Cannot send money to self' });
     const senderWallet = yield wallet_model_1.default.findOne({ user: senderId });
@@ -116,6 +122,9 @@ const blockWallet = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
     try {
         const walletId = req.params.id;
         const { block } = req.body;
+        if (!mongoose_1.default.Types.ObjectId.isValid(walletId)) {
+            return res.status(400).json({ message: "Invalid wallet ID" });
+        }
         if (typeof block !== "boolean") {
             return res
                 .status(400)
@@ -133,7 +142,8 @@ const blockWallet = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
         });
     }
     catch (error) {
-        res.status(500).json({ message: "Internal server error", error });
+        console.error("Block wallet error:", error);
+        res.status(500).json({ message: "Internal server error", error: error.message });
     }
 });
 exports.blockWallet = blockWallet;

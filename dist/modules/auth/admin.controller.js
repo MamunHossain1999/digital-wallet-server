@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAdminDashboard = void 0;
+exports.getAdminProfile = exports.getAdminDashboard = void 0;
 const wallet_model_1 = __importDefault(require("../wallet/wallet.model"));
 const user_model_1 = require("../user/user.model");
 const transaction_model_1 = require("../transaction/transaction.model");
@@ -40,3 +40,19 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
     }
 });
 exports.getAdminDashboard = getAdminDashboard;
+const getAdminProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    try {
+        const adminId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+        if (!adminId)
+            return res.status(401).json({ message: "Unauthorized" });
+        const admin = yield user_model_1.User.findById(adminId).select("name email role status");
+        if (!admin)
+            return res.status(404).json({ message: "Admin not found" });
+        res.json(admin);
+    }
+    catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+});
+exports.getAdminProfile = getAdminProfile;
