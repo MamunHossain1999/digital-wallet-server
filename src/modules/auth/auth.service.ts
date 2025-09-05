@@ -84,19 +84,33 @@ export const loginUser = async (
   await user.save();
 
   // ✅ set cookies
-  res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    sameSite: "lax", // localhost এ কাজ করবে
-    secure: false,   // dev এর জন্য
-    maxAge: 15 * 60 * 1000,
-  });
+  // res.cookie("accessToken", accessToken, {
+  //   httpOnly: true,
+  //   sameSite: "lax", // localhost এ কাজ করবে
+  //   secure: false,   // dev এর জন্য
+  //   maxAge: 15 * 60 * 1000,
+  // });
 
-  res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: false,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
-  });
+  // res.cookie("refreshToken", refreshToken, {
+  //   httpOnly: true,
+  //   sameSite: "lax",
+  //   secure: false,
+  //   maxAge: 7 * 24 * 60 * 60 * 1000,
+  // });
+  res.cookie("accessToken", accessToken, {
+  httpOnly: true,
+  sameSite: "none", // cross-domain support
+  secure: true,     // HTTPS only
+  maxAge: 15 * 60 * 1000,
+});
+
+res.cookie("refreshToken", refreshToken, {
+  httpOnly: true,
+  sameSite: "none",
+  secure: true,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+});
+
 
   return {
     user: {
