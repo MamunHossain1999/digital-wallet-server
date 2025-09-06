@@ -10,42 +10,52 @@ interface BlockWalletRequestBody {
 
 // money add korar jnno
 export const addMoney = async (req: RequestWithUser, res: Response) => {
-  const userId = req.user?.userId;
-  const { amount } = req.body;
+  try {
+    const userId = req.user?.userId;
+    const { amount } = req.body;
 
-  if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
 
-  const wallet = await Wallet.findOne({ user: userId });
-  if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
-  if (wallet.status === 'blocked') return res.status(403).json({ message: 'Wallet is blocked' });
+    const wallet = await Wallet.findOne({ user: userId });
+    if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+    if (wallet.status === 'blocked') return res.status(403).json({ message: 'Wallet is blocked' });
 
-  wallet.balance += amount;
-  await wallet.save();
+    wallet.balance += amount;
+    await wallet.save();
 
-  await Transaction.create({ type: 'add', from: userId, amount, status: 'completed' });
+    await Transaction.create({ type: 'add', from: userId, amount, status: 'completed' });
 
-  res.json({ message: 'Money added successfully', balance: wallet.balance });
+    res.json({ message: 'Money added successfully', balance: wallet.balance });
+  } catch (error) {
+    console.error('Add money error:', error);
+    res.status(500).json({ message: 'Internal server error', error: (error as Error).message });
+  }
 };
 
 // money withdraw korar jnno
 export const withdrawMoney = async (req: RequestWithUser, res: Response) => {
-  const userId = req.user?.userId;
-  const { amount } = req.body;
+  try {
+    const userId = req.user?.userId;
+    const { amount } = req.body;
 
-  if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
+    if (!amount || amount <= 0) return res.status(400).json({ message: 'Invalid amount' });
 
-  const wallet = await Wallet.findOne({ user: userId });
-  if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
-  if (wallet.status === 'blocked') return res.status(403).json({ message: 'Wallet is blocked' });
+    const wallet = await Wallet.findOne({ user: userId });
+    if (!wallet) return res.status(404).json({ message: 'Wallet not found' });
+    if (wallet.status === 'blocked') return res.status(403).json({ message: 'Wallet is blocked' });
 
-  if (wallet.balance < amount) return res.status(400).json({ message: 'Insufficient balance' });
+    if (wallet.balance < amount) return res.status(400).json({ message: 'Insufficient balance' });
 
-  wallet.balance -= amount;
-  await wallet.save();
+    wallet.balance -= amount;
+    await wallet.save();
 
-  await Transaction.create({ type: 'withdraw', from: userId, amount, status: 'completed' });
+    await Transaction.create({ type: 'withdraw', from: userId, amount, status: 'completed' });
 
-  res.json({ message: 'Money withdrawn successfully', balance: wallet.balance });
+    res.json({ message: 'Money withdrawn successfully', balance: wallet.balance });
+  } catch (error) {
+    console.error('Withdraw money error:', error);
+    res.status(500).json({ message: 'Internal server error', error: (error as Error).message });
+  }
 };
 
 // onnno user er kase money send korar jnno - DEPRECATED: Use transaction.controller.ts sendMoney instead

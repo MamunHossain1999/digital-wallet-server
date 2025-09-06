@@ -13,4 +13,7 @@ router.post("/withdraw", (0, verifyToken_1.verifyToken)(["user", "agent", "admin
 router.post("/send", (0, verifyToken_1.verifyToken)(["user", "agent", "admin"]), transaction_controller_1.sendMoney);
 router.get("/history", (0, verifyToken_1.verifyToken)(["user", "agent", "admin"]), transaction_controller_1.getMyTransactions);
 router.get("/admin", (0, verifyToken_1.verifyToken)(["admin"]), transaction_controller_1.getAllTransactions);
+// Agent-specific routes
+router.post("/cash-in", (0, verifyToken_1.verifyToken)(["agent"]), transaction_controller_1.cashIn);
+router.post("/cash-out", (0, verifyToken_1.verifyToken)(["agent"]), transaction_controller_1.cashOut);
 exports.AuthTransaction = router;

@@ -5,7 +5,7 @@ interface RequestWithUser extends Request {
     role: string;
   };
 }
-import { Request, Response } from 'express';
+import { NextFunction, Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Wallet from '../wallet/wallet.model';
 import { Transaction } from './transaction.model';
@@ -112,6 +112,9 @@ export const sendMoney = asyncHandler(async (req: Request, res: Response) => {
     });
 
     res.status(201).json({ message: 'Money sent successfully' });
+  } catch (error) {
+    console.error('Send money error:', error);
+    throw error;
   } finally {
     await session.endSession();
   }
@@ -145,4 +148,190 @@ export const getAllTransactions = asyncHandler(async (req: RequestWithUser, res:
   res.status(200).json(transactions);
  
 });
+
+// Agent cash-in: Add money to any user's wallet
+
+export const cashIn = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const agentId = (req as any).user?.userId;
+    const agentRole = (req as any).user?.role;
+    const { userEmail, amount } = req.body;
+
+    if (agentRole !== "agent") {
+      res
+        .status(403)
+        .json({ message: "Only agents can perform cash-in operations" });
+      return;
+    }
+
+    if (!userEmail || !amount || amount <= 0) {
+      res
+        .status(400)
+        .json({ message: "Valid user email and positive amount required" });
+      return;
+    }
+
+    const targetUser = await User.findOne({ email: userEmail });
+    if (!targetUser) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const targetWallet = await Wallet.findOne({ user: targetUser._id });
+    if (!targetWallet || targetWallet.status === "blocked") {
+      res.status(403).json({ message: "Target wallet not found or blocked" });
+      return;
+    }
+
+    const agentWallet = await Wallet.findOne({ user: agentId });
+    if (!agentWallet || agentWallet.status === "blocked") {
+      res.status(403).json({ message: "Agent wallet not found or blocked" });
+      return;
+    }
+
+    // Commission calculation (2% for cash-in)
+    const commission = amount * 0.02;
+    const netAmount = amount - commission;
+
+    if (agentWallet.balance < amount) {
+      res.status(400).json({ message: "Insufficient agent balance" });
+      return;
+    }
+
+    // Use database transaction for atomic operations
+    const session = await Wallet.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        // Deduct from agent wallet
+        agentWallet.balance -= amount;
+        await agentWallet.save({ session });
+
+        // Add to user wallet (minus commission)
+        targetWallet.balance += netAmount;
+        await targetWallet.save({ session });
+
+        // Create transaction record
+        await Transaction.create(
+          [
+            {
+              from: agentId,
+              to: targetUser._id,
+              amount: netAmount,
+              fee: commission,
+              commission: commission,
+              type: "cash-in",
+              status: "completed",
+            },
+          ],
+          { session }
+        );
+      });
+
+      res.status(201).json({
+        message: "Cash-in successful",
+        amount: netAmount,
+        commission: commission,
+        targetUser: targetUser.email,
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+);
+
+// Agent cash-out: Withdraw money from any user's wallet
+
+export const cashOut = asyncHandler(
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const agentId = (req as any).user?.userId;
+    const agentRole = (req as any).user?.role;
+    const { userEmail, amount } = req.body;
+
+    if (agentRole !== "agent") {
+      res
+        .status(403)
+        .json({ message: "Only agents can perform cash-out operations" });
+      return;
+    }
+
+    if (!userEmail || !amount || amount <= 0) {
+      res
+        .status(400)
+        .json({ message: "Valid user email and positive amount required" });
+      return;
+    }
+
+    const targetUser = await User.findOne({ email: userEmail });
+    if (!targetUser) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    const targetWallet = await Wallet.findOne({ user: targetUser._id });
+    if (!targetWallet || targetWallet.status === "blocked") {
+      res
+        .status(403)
+        .json({ message: "Target wallet not found or blocked" });
+      return;
+    }
+
+    const agentWallet = await Wallet.findOne({ user: agentId });
+    if (!agentWallet || agentWallet.status === "blocked") {
+      res.status(403).json({ message: "Agent wallet not found or blocked" });
+      return;
+    }
+
+    // Commission calculation (1.5% for cash-out)
+    const commission = amount * 0.015;
+    const totalDeduction = amount + commission;
+
+    if (targetWallet.balance < totalDeduction) {
+      res
+        .status(400)
+        .json({ message: "Insufficient user balance (including commission)" });
+      return;
+    }
+
+    // Use database transaction for atomic operations
+    const session = await Wallet.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        // Deduct from user wallet (amount + commission)
+        targetWallet.balance -= totalDeduction;
+        await targetWallet.save({ session });
+
+        // Add to agent wallet
+        agentWallet.balance += amount;
+        await agentWallet.save({ session });
+
+        // Create transaction record
+        await Transaction.create(
+          [
+            {
+              from: targetUser._id,
+              to: agentId,
+              amount: amount,
+              fee: commission,
+              commission: commission,
+              type: "cash-out",
+              status: "completed",
+            },
+          ],
+          { session }
+        );
+      });
+
+      res.status(201).json({
+        message: "Cash-out successful",
+        amount: amount,
+        commission: commission,
+        targetUser: targetUser.email,
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+);
 

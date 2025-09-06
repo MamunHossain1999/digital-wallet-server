@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAllTransactions = exports.getMyTransactions = exports.sendMoney = exports.withdraw = exports.topUp = void 0;
+exports.cashOut = exports.cashIn = exports.getAllTransactions = exports.getMyTransactions = exports.sendMoney = exports.withdraw = exports.topUp = void 0;
 const express_async_handler_1 = __importDefault(require("express-async-handler"));
 const wallet_model_1 = __importDefault(require("../wallet/wallet.model"));
 const transaction_model_1 = require("./transaction.model");
@@ -107,6 +107,10 @@ exports.sendMoney = (0, express_async_handler_1.default)((req, res) => __awaiter
         }));
         res.status(201).json({ message: 'Money sent successfully' });
     }
+    catch (error) {
+        console.error('Send money error:', error);
+        throw error;
+    }
     finally {
         yield session.endSession();
     }
@@ -131,4 +135,156 @@ exports.getAllTransactions = (0, express_async_handler_1.default)((req, res) => 
         .populate('from', 'email role')
         .populate('to', 'email role');
     res.status(200).json(transactions);
+}));
+// Agent cash-in: Add money to any user's wallet
+exports.cashIn = (0, express_async_handler_1.default)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const agentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+    const agentRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+    const { userEmail, amount } = req.body;
+    if (agentRole !== "agent") {
+        res
+            .status(403)
+            .json({ message: "Only agents can perform cash-in operations" });
+        return;
+    }
+    if (!userEmail || !amount || amount <= 0) {
+        res
+            .status(400)
+            .json({ message: "Valid user email and positive amount required" });
+        return;
+    }
+    const targetUser = yield user_model_1.User.findOne({ email: userEmail });
+    if (!targetUser) {
+        res.status(404).json({ message: "User not found" });
+        return;
+    }
+    const targetWallet = yield wallet_model_1.default.findOne({ user: targetUser._id });
+    if (!targetWallet || targetWallet.status === "blocked") {
+        res.status(403).json({ message: "Target wallet not found or blocked" });
+        return;
+    }
+    const agentWallet = yield wallet_model_1.default.findOne({ user: agentId });
+    if (!agentWallet || agentWallet.status === "blocked") {
+        res.status(403).json({ message: "Agent wallet not found or blocked" });
+        return;
+    }
+    // Commission calculation (2% for cash-in)
+    const commission = amount * 0.02;
+    const netAmount = amount - commission;
+    if (agentWallet.balance < amount) {
+        res.status(400).json({ message: "Insufficient agent balance" });
+        return;
+    }
+    // Use database transaction for atomic operations
+    const session = yield wallet_model_1.default.startSession();
+    try {
+        yield session.withTransaction(() => __awaiter(void 0, void 0, void 0, function* () {
+            // Deduct from agent wallet
+            agentWallet.balance -= amount;
+            yield agentWallet.save({ session });
+            // Add to user wallet (minus commission)
+            targetWallet.balance += netAmount;
+            yield targetWallet.save({ session });
+            // Create transaction record
+            yield transaction_model_1.Transaction.create([
+                {
+                    from: agentId,
+                    to: targetUser._id,
+                    amount: netAmount,
+                    fee: commission,
+                    commission: commission,
+                    type: "cash-in",
+                    status: "completed",
+                },
+            ], { session });
+        }));
+        res.status(201).json({
+            message: "Cash-in successful",
+            amount: netAmount,
+            commission: commission,
+            targetUser: targetUser.email,
+        });
+    }
+    finally {
+        yield session.endSession();
+    }
+}));
+// Agent cash-out: Withdraw money from any user's wallet
+exports.cashOut = (0, express_async_handler_1.default)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const agentId = (_a = req.user) === null || _a === void 0 ? void 0 : _a.userId;
+    const agentRole = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+    const { userEmail, amount } = req.body;
+    if (agentRole !== "agent") {
+        res
+            .status(403)
+            .json({ message: "Only agents can perform cash-out operations" });
+        return;
+    }
+    if (!userEmail || !amount || amount <= 0) {
+        res
+            .status(400)
+            .json({ message: "Valid user email and positive amount required" });
+        return;
+    }
+    const targetUser = yield user_model_1.User.findOne({ email: userEmail });
+    if (!targetUser) {
+        res.status(404).json({ message: "User not found" });
+        return;
+    }
+    const targetWallet = yield wallet_model_1.default.findOne({ user: targetUser._id });
+    if (!targetWallet || targetWallet.status === "blocked") {
+        res
+            .status(403)
+            .json({ message: "Target wallet not found or blocked" });
+        return;
+    }
+    const agentWallet = yield wallet_model_1.default.findOne({ user: agentId });
+    if (!agentWallet || agentWallet.status === "blocked") {
+        res.status(403).json({ message: "Agent wallet not found or blocked" });
+        return;
+    }
+    // Commission calculation (1.5% for cash-out)
+    const commission = amount * 0.015;
+    const totalDeduction = amount + commission;
+    if (targetWallet.balance < totalDeduction) {
+        res
+            .status(400)
+            .json({ message: "Insufficient user balance (including commission)" });
+        return;
+    }
+    // Use database transaction for atomic operations
+    const session = yield wallet_model_1.default.startSession();
+    try {
+        yield session.withTransaction(() => __awaiter(void 0, void 0, void 0, function* () {
+            // Deduct from user wallet (amount + commission)
+            targetWallet.balance -= totalDeduction;
+            yield targetWallet.save({ session });
+            // Add to agent wallet
+            agentWallet.balance += amount;
+            yield agentWallet.save({ session });
+            // Create transaction record
+            yield transaction_model_1.Transaction.create([
+                {
+                    from: targetUser._id,
+                    to: agentId,
+                    amount: amount,
+                    fee: commission,
+                    commission: commission,
+                    type: "cash-out",
+                    status: "completed",
+                },
+            ], { session });
+        }));
+        res.status(201).json({
+            message: "Cash-out successful",
+            amount: amount,
+            commission: commission,
+            targetUser: targetUser.email,
+        });
+    }
+    finally {
+        yield session.endSession();
+    }
 }));
